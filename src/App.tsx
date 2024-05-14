@@ -98,22 +98,20 @@ export default function App() {
   const createSender = async () => {
     // create a new Keypair
 
-
-    console.log('Sender account: ', senderKeypair!.publicKey.toString());
+    const newSenderKeypair = Keypair.generate();
+    console.log('Sender account: ', newSenderKeypair.publicKey.toString());
     console.log('Airdropping 2 SOL to Sender Wallet');
+    
+    // request airdrop into this new account
+    await connection.requestAirdrop(newSenderKeypair.publicKey, LAMPORTS_PER_SOL * 2);
 
     // save this new KeyPair into this state variable
-    setSenderKeypair(/*KeyPair here*/);
-
-    // request airdrop into this new account
+    setSenderKeypair(newSenderKeypair);
     
 
     const latestBlockHash = await connection.getLatestBlockhash();
-
-    // now confirm the transaction
-
-    console.log('Wallet Balance: ' + (await connection.getBalance(senderKeypair!.publicKey)) / LAMPORTS_PER_SOL);
-  }
+    console.log('Wallet Balance: ' + (await connection.getBalance(newSenderKeypair.publicKey)) / LAMPORTS_PER_SOL);
+}
 
   /**
    * @description prompts user to connect wallet if it exists.
@@ -126,15 +124,13 @@ export default function App() {
     // checks if phantom wallet exists
     if (solana) {
       try {
-        // connect to phantom wallet and return response which includes the wallet public key
-
-        // save the public key of the phantom wallet to the state variable
-        setReceiverPublicKey(/*PUBLIC KEY*/);
-      } catch (err) {
+        const { publicKey } = await solana.connect();
+        setReceiverPublicKey(publicKey);
+    } catch (err) {
         console.log(err);
-      }
     }
-  };
+}
+};
 
   /**
    * @description disconnects wallet if it exists.
@@ -161,10 +157,27 @@ export default function App() {
    * This function is called when the Transfer SOL to Phantom Wallet button is clicked
    */
   const transferSol = async () => {    
-    
-    // create a new transaction for the transfer
+    if (!senderKeypair) {
+      console.error('Sender Keypair is not defined.');
+      return;
+  }
 
-    // send and confirm the transaction
+  const transaction = new Transaction().add(
+      SystemProgram.transfer({
+          fromPubkey: senderKeypair.publicKey,
+          toPubkey: receiverPublicKey!,
+          lamports: LAMPORTS_PER_SOL,
+      })
+  );
+
+  // send and confirm the transaction
+  await sendAndConfirmTransaction(
+      connection,
+      transaction,
+      [senderKeypair],
+      { commitment: 'confirmed' }
+  );
+
 
     console.log("transaction sent and confirmed");
     console.log("Sender Balance: " + await connection.getBalance(senderKeypair!.publicKey) / LAMPORTS_PER_SOL);
